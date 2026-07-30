@@ -10,8 +10,8 @@ load_dotenv(override=True)
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
 
-# 🎯 단종된 2.5-flash 대신 정식 지원되는 gemini-1.5-flash (또는 gemini-2.0-flash) 지정
-raw_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+# 🎯 구글 공식 최신 플래시 통합명인 gemini-flash-latest 사용!
+raw_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
 MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
