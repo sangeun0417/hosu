@@ -8,15 +8,11 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-if not api_key:
-    # Render 배포 환경변수에서 불러오므로, 서버 구동 시 체크
-    print("⚠️ GEMINI_API_KEY 환경변수를 확인해 줘!")
-
+VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
 client = genai.Client(api_key=api_key) if api_key else None
 
 app = FastAPI(title="호수부동산 상업용 AI 백엔드 API")
 
-# 🔒 [보안] 모든 프론트엔드 웹 도메인에서의 요청 허용
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,6 +24,7 @@ app.add_middleware(
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
     topic: str = Field(..., example="올림픽파크포레온 매매 전망 및 입지 분석")
+    access_code: str = Field(default="4785949", example="4785949")
 
 class BlogResponse(BaseModel):
     success: bool
@@ -36,14 +33,18 @@ class BlogResponse(BaseModel):
 
 @app.post("/api/generate-blog", response_model=BlogResponse)
 async def generate_blog(request: BlogRequest):
+    if request.access_code != VALID_ACCESS_CODE:
+        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
+
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
     place_url = "https://map.naver.com/p/entry/place/2004075757?placePath=%2Fhome%3Fentry%3Dplt%26from%3Dmap%26fromPanelNum%3D1%26additionalHeight%3D76%26timestamp%3D202607310124%26locale%3Dko%26svcName%3Dmap_pcv5&searchType=place&lng=127.1370449&lat=37.5274744&c=15.00,0,0,0,dh"
 
+    # 🎯 고정 예시문 제거 + 구체적이고 풍부한 생성을 유도하는 동적 프롬프트
     prompt = f"""
     너는 현장을 발로 뛰며 깊이 있는 분석을 제공하는 부동산 대표 전문 블로거 '호수부동산'이야.
-    네이버 블로그에 그대로 붙여넣었을 때 독자 반응과 가독성이 가장 높은 최고급 원고를 작성해 줘.
+    주제({request.topic})와 지역({request.location})에 맞게, 읽을거리가 풍부하고 전문성이 느껴지는 고품질 네이버 블로그 원고를 작성해 줘.
 
     [기본 정보]
     - 작성자: 호수부동산
@@ -52,7 +53,7 @@ async def generate_blog(request: BlogRequest):
 
     [출력 규칙]
     첫 번째 줄: [제목] 🏠 {request.location} {request.topic} 핵심 현장 분석 및 매수 전략
-    (주의: 단어가 연속으로 중복되지 않도록 자연스럽게 다듬을 것)
+    (주의: 단어가 연속 중복되지 않게 매끄럽게 작성)
 
     [본문 작성 양식]
     1. 상단 브리핑 박스:
@@ -62,23 +63,23 @@ async def generate_blog(request: BlogRequest):
        오늘 리포트에서는 <b>{request.topic}</b>에 대한 생생한 현장 분위기와 실거래 데이터 기반의 향후 전망을 정밀 분석해 드립니다.
        </div>
 
-    2. 첫 번째 소제목 및 현장 분위기 분석 (3~4문장으로 알차게 작성):
+    2. 첫 번째 소제목 및 현장 분위기 분석:
        <h3 style="color: #00c73c; border-bottom: 2px solid #00c73c; padding-bottom: 5px; margin-top: 30px; font-size: 18px;">📌 1. 최근 현장 분위기 및 매매 시세 동향</h3>
-       최근 {request.location} 일대는 입주장 매물 소진이 진행되면서 가격 하방 지지선이 매우 탄탄하게 형성되고 있습니다. 매도자들은 호가를 쉽게 낮추지 않는 분위기이며, 급매물 소진 후 대기 매수자들의 문의가 지속적으로 이어지고 있습니다. 실거주 의무 유예 조치와 맞물려 매수 심리가 안정화되면서 상급지 갈아타기 수요의 유입이 눈에 띄게 증가하는 추세입니다.
+       ({request.location} 일대의 시세 움직임, 매도자/매수자 심리, 실거래가 추이, 입주장 및 매물 소진 분위기를 최소 4~5문장 이상으로 풍부하고 상세하게 분석해 작성할 것)
 
        <p style="color: #888; font-size: 14px; text-align: center; margin: 15px 0;">📷 [추천 사진: 단지 전경 및 인근 부동산 현장 사진]</p>
 
-    3. 두 번째 소제목 및 핵심 입지 분석 (이모지 활용 불렛포인트 3개):
+    3. 두 번째 소제목 및 핵심 입지 분석:
        <h3 style="color: #00c73c; border-bottom: 2px solid #00c73c; padding-bottom: 5px; margin-top: 30px; font-size: 18px;">📌 2. 핵심 입지 가치 및 주요 프리미엄 요인</h3>
-       • 🚆 <b>우수한 교통 인프라</b>: 지하철 역세권 입지로 강남(GBD) 및 주요 업무지구로의 출퇴근이 매우 편리합니다.<br>
-       • 🏫 <b>명문 학군 및 생활 환경</b>: 단지 인근 초·중·고교 및 학원가 접근성이 뛰어납니다.<br>
-       • 📈 <b>미래 가치 & 대장주 프리미엄</b>: 대단지 인프라와 주변 개발 호재가 맞물려 장기 시세 상승 동력이 확실합니다.
+       • 🚆 <b>우수한 교통 인프라</b>: ({request.location} 인근 실제 지하철 노선과 업무지구 접근성을 살려 2문장으로 상세 작성)<br>
+       • 🏫 <b>명문 학군 및 생활 환경</b>: ({request.location} 주변 초·중·고 학군 및 편의시설, 공원 환경을 2문장으로 작성)<br>
+       • 📈 <b>미래 가치 & 대장주 프리미엄</b>: (주요 개발 호재 및 대단지 프리미엄의 장기 우상향 동력을 2문장으로 작성)
 
     4. 세 번째 소제목 및 실전 매수 전략 체크리스트 박스:
        <h3 style="color: #00c73c; border-bottom: 2px solid #00c73c; padding-bottom: 5px; margin-top: 30px; font-size: 18px;">📌 3. 호수부동산의 실전 타이밍 조언</h3>
        <div style="background-color: #f8f9fa; border: 1px dashed #00c73c; padding: 18px; margin: 15px 0; border-radius: 6px;">
-       ✔ <b>실거주 희망자</b>: 로열동·로열층 기준 경쟁력 있는 매물이 나왔을 때 소신 매수 권장<br>
-       ✔ <b>투자 희망자</b>: 전세가율 추이를 면밀히 살피며 3~5년 이상 장기 관점 접근 유효
+       ✔ <b>실거주 희망자</b>: ({request.location} 실거주자를 위한 타이밍 및 로열동/로열층 매수 조언 2문장)<br>
+       ✔ <b>투자 희망자</b>: (전세가율 추이 및 장기 관점 갭투자 전략 조언 2문장)
        </div>
 
     5. 하단 명함 카드:
