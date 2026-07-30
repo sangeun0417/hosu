@@ -1,6 +1,5 @@
 import os
-import random
-import time
+import base64
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -16,7 +15,7 @@ MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 도심 아파트 맞춤 클린 이미지 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - Imagen 3 AI 이미지 맞춤 생성 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,29 +25,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📸 [100% 안전 + 관련성 극대화] 도심 고층 아파트 & 모던 실내 인테리어 전용 화보 공급 함수
-def get_safe_real_estate_images():
-    # 🏢 100% 도심 고층 아파트 단지 건물 전경 (단독주택/열쇠모형/야자수 완전 제거)
-    exteriors = [
-        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80", # 도심 고층 아파트 단지
-        "https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80", # 고밀도 아파트 타워
-        "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=800&q=80", # 현대식 아파트 건물
-        "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80"   # 도심 아파트 빌딩
-    ]
-    
-    # 🛋️ 100% 한국 아파트 구조 느낌의 모던 실내 거실/인테리어 화보
-    interiors = [
-        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80", # 모던 아파트 거실
-        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80", # 깔끔한 거실 공간
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80"  # 화이트톤 아파트 거실
-    ]
-    
-    # 🎯 브라우저 이미지 캐싱 방지용 타임스탬프 파라미터 추가
-    cache_buster = int(time.time())
-    img1 = f"{random.choice(exteriors)}&cb={cache_buster}"
-    img2 = f"{random.choice(interiors)}&cb={cache_buster+1}"
-    
-    return img1, img2
+# 🎨 [AI 맞춤 생성] 구글 Imagen 3 모델을 활용해 극사실주의 부동산 사진을 즉석 생성하는 함수
+def generate_ai_real_estate_image(prompt_text: str, fallback_url: str) -> str:
+    if not client:
+        return fallback_url
+
+    try:
+        # 구글 Imagen 3 모델 호출
+        result = client.models.generate_images(
+            model='imagen-3.0-generate-002',
+            prompt=prompt_text,
+            config=dict(
+                number_of_images=1,
+                aspect_ratio="16:9",
+                output_mime_type="image/jpeg"
+            )
+        )
+        
+        # 생성된 이미지 바이트를 Base64 데이터 URL로 변환하여 HTML에 직접 삽입
+        for generated_image in result.generated_images:
+            encoded = base64.b64encode(generated_image.image.image_bytes).decode('utf-8')
+            return f"data:image/jpeg;base64,{encoded}"
+
+    except Exception as e:
+        print(f"⚠️ Imagen 3 이미지 생성 실패 (기본 고화질 이미지 대체): {e}")
+        return fallback_url
+
+    return fallback_url
 
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
@@ -68,8 +71,23 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🎯 도심 아파트 주제와 입치성이 뛰어난 안전 이미지 2장 획득 (캐시 방지 적용)
-    img_exterior, img_interior = get_safe_real_estate_images()
+    # 🏢 1. 아파트 건물 외관 프롬프트 (서울 도심 고층 아파트 전경 지정)
+    ext_prompt = (
+        f"A photorealistic, architectural photography style exterior shot of a modern luxury high-rise "
+        f"apartment building complex in {request.location}, Seoul, South Korea. Sunny daylight, 8k resolution, clean background."
+    )
+    fallback_ext = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
+    
+    # 🛋️ 2. 아파트 실내 인테리어 프롬프트 (한국형 모던 거실 지정)
+    int_prompt = (
+        f"A photorealistic interior view of a modern luxury Korean apartment living room in {request.location}, "
+        f"minimalist interior design, large windows, bright sunlight, clean modern furniture, high resolution."
+    )
+    fallback_int = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
+
+    # 🖼️ Imagen 3 AI 모델로 100% 맞춤형 이미지 2장 즉석 생성
+    img_exterior = generate_ai_real_estate_image(ext_prompt, fallback_ext)
+    img_interior = generate_ai_real_estate_image(int_prompt, fallback_int)
 
     place_url = "https://map.naver.com/p/entry/place/2004075757"
 
