@@ -5,13 +5,21 @@ from pydantic import BaseModel, Field
 from google import genai
 from dotenv import load_dotenv
 
+# .env 파일 환경변수 로드
 load_dotenv(override=True)
+
+# 1. 환경변수 불러오기
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
+# 🎯 모델 이름을 환경변수에서 동적으로 로드 (기본값: gemini-2.5-flash)
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+
+if not api_key:
+    print("⚠️ GEMINI_API_KEY 환경변수가 설정되지 않았어!")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 실물 이미지 자동 삽입")
+app = FastAPI(title="호수부동산 AI 백엔드 API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +41,7 @@ class BlogResponse(BaseModel):
 
 @app.post("/api/generate-blog", response_model=BlogResponse)
 async def generate_blog(request: BlogRequest):
+    # 🔒 비밀번호 검증
     if request.access_code != VALID_ACCESS_CODE:
         raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
 
@@ -41,11 +50,9 @@ async def generate_blog(request: BlogRequest):
 
     place_url = "https://map.naver.com/p/entry/place/2004075757?placePath=%2Fhome%3Fentry%3Dplt%26from%3Dmap%26fromPanelNum%3D1%26additionalHeight%3D76%26timestamp%3D202607310124%26locale%3Dko%26svcName%3Dmap_pcv5&searchType=place&lng=127.1370449&lat=37.5274744&c=15.00,0,0,0,dh"
 
-    # 🖼️ 고화질 부동산/아파트 스톡 이미지 URL (네이버 복사 시 이미지 형태로 즉시 붙여넣어짐)
     img_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
     img_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
 
-    # 🎯 원고 고정 + 실물 이미지 태그 내장 프롬프트
     prompt = f"""
     너는 현장을 발로 뛰며 깊이 있는 분석을 제공하는 부동산 대표 전문 블로거 '호수부동산'이야.
     주제({request.topic})와 지역({request.location})에 맞게, 읽을거리가 풍부하고 전문성이 느껴지는 고품질 네이버 블로그 원고를 작성해 줘.
@@ -71,7 +78,6 @@ async def generate_blog(request: BlogRequest):
        <h3 style="color: #00c73c; border-bottom: 2px solid #00c73c; padding-bottom: 5px; margin-top: 30px; font-size: 18px;">📌 1. 최근 현장 분위기 및 매매 시세 동향</h3>
        ({request.location} 일대의 시세 움직임, 매도자/매수자 심리, 실거래가 추이, 입주장 및 매물 소진 분위기를 최소 4~5문장 이상으로 풍부하고 상세하게 분석해 작성할 것)
 
-       <!-- 🖼️ 실물 아파트 단지 전경 이미지 삽입 -->
        <div style="text-align: center; margin: 20px 0;">
            <img src="{img_exterior}" alt="{request.location} 단지 전경" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
@@ -82,7 +88,6 @@ async def generate_blog(request: BlogRequest):
        • 🏫 <b>명문 학군 및 생활 환경</b>: ({request.location} 주변 초·중·고 학군 및 편의시설, 공원 환경을 2문장으로 작성)<br>
        • 📈 <b>미래 가치 & 대장주 프리미엄</b>: (주요 개발 호재 및 대단지 프리미엄의 장기 우상향 동력을 2문장으로 작성)
 
-       <!-- 🖼️ 실물 조경/인프라 이미지 삽입 -->
        <div style="text-align: center; margin: 20px 0;">
            <img src="{img_interior}" alt="{request.location} 단지 인프라" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
@@ -106,8 +111,9 @@ async def generate_blog(request: BlogRequest):
     """
 
     try:
+        # 🎯 환경변수로 읽어온 모델명(MODEL_NAME) 사용
         response = client.models.generate_content(
-            model="gemini-flash-latest",
+            model=MODEL_NAME,
             contents=prompt
         )
         raw_text = response.text.strip()
@@ -129,4 +135,4 @@ async def generate_blog(request: BlogRequest):
             blog_post=content
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API 호출 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gemini API 호출 실패 ({MODEL_NAME}): {str(e)}")
