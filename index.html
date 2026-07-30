@@ -80,8 +80,9 @@
                     bodyResult.innerText = "❌ 오류 발생: " + JSON.stringify(data);
                 }
             } catch (err) {
-                bodyResult.innerText = "❌ 서버 통신 오류! Uvicorn 서버가 켜져 있는지 확인해 줘.";
-            }
+    // Render 슬립 모드 및 네트워크 오프라인 안내로 문구 개선
+    bodyResult.innerText = "❌ 서버 통신 오류! Render 서버가 잠에서 깨어나는 중이거나 네트워크 연결을 확인해 줘.";
+}
         }
 
         function copyTitle() {
