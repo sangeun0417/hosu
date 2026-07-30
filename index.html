@@ -54,6 +54,13 @@
 
             if(!location || !topic) return alert("지역과 주제를 모두 입력해 줘!");
 
+            // 🔑 1. 비밀번호 입력 팝업 띄우기
+            const accessCode = prompt("🔐 호수부동산 전용 이용 암호를 입력해 주세요:");
+            if (!accessCode) {
+                alert("비밀번호를 입력해야 원고를 생성할 수 있어!");
+                return;
+            }
+
             titleBox.style.display = "block";
             bodyBox.style.display = "block";
             titleResult.innerHTML = "⏳ <b>제목 생성 중...</b>";
@@ -62,11 +69,24 @@
             copyBodyBtn.style.display = "none";
 
             try {
+                // 🔑 2. 백엔드로 입력받은 access_code 전송
                 const response = await fetch('https://hosu-api.onrender.com/api/generate-blog', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location, topic })
-});
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        location: location, 
+                        topic: topic, 
+                        access_code: accessCode 
+                    })
+                });
+
+                // ❌ 3. 비밀번호 틀렸을 때 예외 처리 (401 Unauthorized)
+                if (response.status === 401) {
+                    titleResult.innerHTML = "<span style='color:red;'>❌ 접근 거부</span>";
+                    bodyResult.innerHTML = "<b style='color:red;'>❌ 비밀번호가 올바르지 않습니다! 이용 권한이 없습니다.</b>";
+                    return;
+                }
+
                 const data = await response.json();
                 
                 if(data.success) {
@@ -80,9 +100,8 @@
                     bodyResult.innerText = "❌ 오류 발생: " + JSON.stringify(data);
                 }
             } catch (err) {
-    // Render 슬립 모드 및 네트워크 오프라인 안내로 문구 개선
-    bodyResult.innerText = "❌ 서버 통신 오류! Render 서버가 잠에서 깨어나는 중이거나 네트워크 연결을 확인해 줘.";
-}
+                bodyResult.innerText = "❌ 서버 통신 오류! Render 서버가 잠에서 깨어나는 중이거나 네트워크 연결을 확인해 줘.";
+            }
         }
 
         function copyTitle() {
