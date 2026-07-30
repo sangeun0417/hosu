@@ -12,7 +12,7 @@ load_dotenv(override=True)
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
 # 🎯 모델 이름을 환경변수에서 동적으로 로드 (기본값: gemini-2.5-flash)
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
 
 if not api_key:
     print("⚠️ GEMINI_API_KEY 환경변수가 설정되지 않았어!")
