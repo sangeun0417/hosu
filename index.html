@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>호수부동산 황금비율 AI 블로그 생성기</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 30px auto; padding: 20px; line-height: 1.6; background-color: #f7f9fa; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        input, button { padding: 12px; margin: 6px 0; width: 100%; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        .btn-generate { background-color: #00c73c; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-copy-title { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; display: none; }
+        .btn-copy-body { background-color: #03cf5d; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; display: none; }
+        
+        .result-box { background: #ffffff; padding: 20px; border-radius: 6px; border: 1px solid #e1e4e8; margin-top: 15px; }
+        #titleResult { font-size: 17px; font-weight: bold; color: #007bff; }
+        .tip-box { background-color: #eef7ff; border: 1px solid #b8daff; color: #004085; padding: 10px 15px; border-radius: 4px; font-size: 13px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🏢 호수부동산 전문가형 AI 블로그 생성기</h2>
+        <input type="text" id="location" placeholder="지역 입력 (예: 강동구 둔촌동)">
+        <input type="text" id="topic" placeholder="주제 입력 (예: 올림픽파크포레온 매매 전망 및 입지 분석)">
+        <button class="btn-generate" onclick="generateBlog()">원고 생성하기 🚀</button>
+
+        <div class="tip-box">
+            💡 <b>제목 폰트 팁</b>: 네이버 블로그 '제목' 칸에 붙여넣은 후, 네이버 상단 폰트 메뉴에서 <b>'본고딕' 또는 '나눔고딕'</b>을 클릭하면 손글씨가 깔끔한 기본 폰트로 바뀝니다!
+        </div>
+
+        <button id="copyTitleBtn" class="btn-copy-title" onclick="copyTitle()">📌 [1단계] 깔끔한 제목 복사하기</button>
+        <div id="titleBox" class="result-box" style="display:none;">
+            <div id="titleResult"></div>
+        </div>
+
+        <button id="copyBodyBtn" class="btn-copy-body" onclick="copyBody()">📋 [2단계] 황금비율 본문 전체 복사하기</button>
+        <div id="bodyBox" class="result-box" style="display:none;">
+            <div id="bodyResult"></div>
+        </div>
+    </div>
+
+    <script>
+        let rawTitle = "";
+
+        async function generateBlog() {
+            const location = document.getElementById('location').value;
+            const topic = document.getElementById('topic').value;
+            const titleResult = document.getElementById('titleResult');
+            const bodyResult = document.getElementById('bodyResult');
+            const titleBox = document.getElementById('titleBox');
+            const bodyBox = document.getElementById('bodyBox');
+            const copyTitleBtn = document.getElementById('copyTitleBtn');
+            const copyBodyBtn = document.getElementById('copyBodyBtn');
+
+            if(!location || !topic) return alert("지역과 주제를 모두 입력해 줘!");
+
+            titleBox.style.display = "block";
+            bodyBox.style.display = "block";
+            titleResult.innerHTML = "⏳ <b>제목 생성 중...</b>";
+            bodyResult.innerHTML = "⏳ <b>전문성 높은 황금비율 원고 작성 중... (약 4초)</b>";
+            copyTitleBtn.style.display = "none";
+            copyBodyBtn.style.display = "none";
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate-blog', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ location, topic })
+                });
+                const data = await response.json();
+                
+                if(data.success) {
+                    rawTitle = data.title;
+                    titleResult.innerText = data.title;
+                    bodyResult.innerHTML = marked.parse(data.blog_post);
+
+                    copyTitleBtn.style.display = "block";
+                    copyBodyBtn.style.display = "block";
+                } else {
+                    bodyResult.innerText = "❌ 오류 발생: " + JSON.stringify(data);
+                }
+            } catch (err) {
+                bodyResult.innerText = "❌ 서버 통신 오류! Uvicorn 서버가 켜져 있는지 확인해 줘.";
+            }
+        }
+
+        function copyTitle() {
+            navigator.clipboard.writeText(rawTitle).then(() => {
+                alert("🎉 제목 복사 완료! 네이버 블로그 '제목' 칸에 붙여넣어 봐!");
+            });
+        }
+
+        function copyBody() {
+            const bodyResult = document.getElementById('bodyResult');
+            const range = document.createRange();
+            range.selectNode(bodyResult);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+
+            try {
+                document.execCommand('copy');
+                alert("🎉 알찬 서식 본문 복사 완료! 네이버 블로그 '본문' 칸에 붙여넣기(Ctrl+V) 해 봐!");
+            } catch (err) {
+                alert("복사 오류: " + err);
+            }
+            window.getSelection().removeAllRanges();
+        }
+    </script>
+</body>
+</html>
