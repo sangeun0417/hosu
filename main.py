@@ -1,7 +1,5 @@
 import os
-import urllib.parse
-import urllib.request
-import json
+import random
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -15,13 +13,9 @@ VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
 raw_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
 MODEL_NAME = raw_model.replace("models/", "")
 
-# 🎯 네이버 API 키 환경변수 로드
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "").strip()
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
-
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 정밀 필터링 실물 이미지 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 프리미엄 클린 이미지 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,62 +25,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📸 [고도화] 유튜브 썸네일 및 초상권/저작권 노이즈를 싹 제거하는 정밀 이미지 검색 함수
-def get_naver_real_images(location: str):
-    # 백업용 100% 안전 고화질 건물 사진
-    default_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
-    default_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
-
-    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-        return default_exterior, default_interior
-
-    try:
-        # 단지 건물 전경 키워드로 30개 검색
-        clean_keyword = f"{location} 아파트 단지 건물 전경"
-        encText = urllib.parse.quote(clean_keyword)
-        
-        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=30&sort=sim&filter=medium"
-        
-        request = urllib.request.Request(url)
-        request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
-        request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
-        
-        response = urllib.request.urlopen(request)
-        if response.getcode() == 200:
-            data = json.loads(response.read().decode('utf-8'))
-            items = data.get('items', [])
-            
-            # 🛡️ 1. 링크 도메인 + 블로그 제목(title)에 포함된 자극적 찌라시 단어 블랙리스트
-            bad_keywords = [
-                'ytimg', 'youtube', 'thumb', 'capture', 'face', 'tv', 'news',
-                '유튜브', '상가', '울고', '현실', '속보', '폭락', '폭등', '경악',
-                '인터뷰', '방송', '채널', '구독', '카드뉴스', '자막', '유튜버', '썸네일'
-            ]
-            
-            clean_images = []
-            for item in items:
-                link = item.get('link', '').lower()
-                title = item.get('title', '').lower()
-                
-                # 🎯 2중 검문: 이미지 링크나 원본 글 제목에 블랙리스트 단어가 하나라도 있으면 바로 스킵!
-                if any(bad in link for bad in bad_keywords) or any(bad in title for bad in bad_keywords):
-                    continue
-                
-                clean_images.append(item.get('link'))
-                
-                # 깨끗한 사진 2장 확보되면 즉시 종료
-                if len(clean_images) == 2:
-                    break
-            
-            if len(clean_images) >= 2:
-                return clean_images[0], clean_images[1]
-            elif len(clean_images) == 1:
-                return clean_images[0], default_interior
-
-    except Exception as e:
-        print(f"⚠️ 이미지 정밀 검색 실패: {e}")
-
-    return default_exterior, default_interior
+# 📸 [100% 안전] 저작권/초상권 리스크 0% 프리미엄 부동산 이미지 공급 함수
+def get_safe_real_estate_images():
+    # 🏢 고급 아파트 건물 외관 화보 모음 (Unsplash CC0 라이선스)
+    exteriors = [
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80"
+    ]
+    
+    # 🛋️ 프리미엄 아파트 실내 인테리어 화보 모음 (Unsplash CC0 라이선스)
+    interiors = [
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80"
+    ]
+    
+    # 원고 생성 시 다채로운 비주얼을 위해 랜덤 조합
+    return random.choice(exteriors), random.choice(interiors)
 
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
@@ -106,9 +66,8 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🎯 입력된 지역과 주제에서 키워드를 정제해 안전한 필터링 이미지 검색 호출
-    search_keyword = f"{request.location} {request.topic.split()[0]}"
-    img_exterior, img_interior = get_naver_real_images(search_keyword)
+    # 🎯 저작권 100% 안전한 프리미엄 외관 & 실내 사진 획득
+    img_exterior, img_interior = get_safe_real_estate_images()
 
     place_url = "https://map.naver.com/p/entry/place/2004075757"
 
