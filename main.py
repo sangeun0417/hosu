@@ -21,7 +21,7 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 네이버 실물 이미지 동적 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 정밀 필터링 실물 이미지 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📸 네이버 이미지 검색 함수 (실물 사진 2장 자동 수집)
+# 📸 [고도화] 유튜브 썸네일 및 초상권/저작권 노이즈를 싹 제거하는 정밀 이미지 검색 함수
 def get_naver_real_images(keyword: str):
     # 기본 백업 이미지 (네이버 검색 실패 시 사용)
     default_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
@@ -42,8 +42,12 @@ def get_naver_real_images(keyword: str):
         return default_exterior, default_interior
 
     try:
-        encText = urllib.parse.quote(f"{keyword} 아파트 단지 현장")
-        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=5&sort=sim&filter=medium"
+        # 🎯 1. 검색어 단에서 '-유튜브 -방송'을 명시해 1차 찌꺼기 차단
+        clean_keyword = f"{keyword} 아파트 단지 -유튜브 -방송"
+        encText = urllib.parse.quote(clean_keyword)
+        
+        # 🎯 2. 검수를 위해 20개의 결과를 넉넉하게 불러옴
+        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=20&sort=sim&filter=medium"
         
         request = urllib.request.Request(url)
         request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
@@ -57,15 +61,33 @@ def get_naver_real_images(keyword: str):
             data = json.loads(response_body.decode('utf-8'))
             items = data.get('items', [])
             
-            if len(items) >= 2:
-                # 검색된 실제 사진 중 1번째, 2번째 고화질 이미지 추출
-                img1 = items[0]['link']
-                img2 = items[1]['link']
-                return img1, img2
-            elif len(items) == 1:
-                return items[0]['link'], default_interior
+            # 🛡️ 3. 강제 차단할 노이즈 키워드/도메인 블랙리스트
+            blacklist = [
+                'ytimg.com', 'youtube', 'thumbnail', 'thumb', 
+                'blogpds', 'post-phinf', 'namu.wiki', 'capture', 'face'
+            ]
+            
+            clean_images = []
+            for item in items:
+                link = item.get('link', '')
+                
+                # 블랙리스트 도메인이 들어간 링크는 단칼에 무시
+                if any(bad_word in link.lower() for bad_word in blacklist):
+                    continue
+                
+                clean_images.append(link)
+                
+                # 안전한 필터링 이미지 2장이 모이면 검색 즉시 종료
+                if len(clean_images) == 2:
+                    break
+            
+            if len(clean_images) >= 2:
+                return clean_images[0], clean_images[1]
+            elif len(clean_images) == 1:
+                return clean_images[0], default_interior
+
     except Exception as e:
-        print(f"⚠️ 네이버 이미지 검색 중 오류 발생: {str(e)}")
+        print(f"⚠️ 네이버 정밀 이미지 검색 중 오류 발생: {str(e)}")
 
     return default_exterior, default_interior
 
@@ -87,7 +109,7 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🎯 [핵심] 입력된 지역과 주제로 네이버에서 진짜 실물 현장 사진 2장 자동 수집!
+    # 🎯 입력된 지역과 주제에서 키워드를 정제해 안전한 필터링 이미지 검색 호출
     search_keyword = f"{request.location} {request.topic.split()[0]}"
     img_exterior, img_interior = get_naver_real_images(search_keyword)
 
