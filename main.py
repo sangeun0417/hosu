@@ -5,21 +5,18 @@ from pydantic import BaseModel, Field
 from google import genai
 from dotenv import load_dotenv
 
-# .env 파일 환경변수 로드
 load_dotenv(override=True)
 
-# 1. 환경변수 불러오기
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
-# 🎯 모델 이름을 환경변수에서 동적으로 로드 (기본값: gemini-2.5-flash)
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
 
-if not api_key:
-    print("⚠️ GEMINI_API_KEY 환경변수가 설정되지 않았어!")
+# 🎯 환경변수에서 gemini-2.5-flash 로드 (models/ 접두사 제거 안전 처리)
+raw_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API")
+app = FastAPI(title="호수부동산 AI 백엔드 API - Gemini 2.5 Flash 적용")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,15 +38,13 @@ class BlogResponse(BaseModel):
 
 @app.post("/api/generate-blog", response_model=BlogResponse)
 async def generate_blog(request: BlogRequest):
-    # 🔒 비밀번호 검증
     if request.access_code != VALID_ACCESS_CODE:
         raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
 
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    place_url = "https://map.naver.com/p/entry/place/2004075757?placePath=%2Fhome%3Fentry%3Dplt%26from%3Dmap%26fromPanelNum%3D1%26additionalHeight%3D76%26timestamp%3D202607310124%26locale%3Dko%26svcName%3Dmap_pcv5&searchType=place&lng=127.1370449&lat=37.5274744&c=15.00,0,0,0,dh"
-
+    place_url = "https://map.naver.com/p/entry/place/2004075757"
     img_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
     img_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
 
@@ -111,7 +106,7 @@ async def generate_blog(request: BlogRequest):
     """
 
     try:
-        # 🎯 환경변수로 읽어온 모델명(MODEL_NAME) 사용
+        # 🎯 gemini-2.5-flash 모델 직접 호출
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt
