@@ -1,4 +1,7 @@
 import os
+import urllib.parse
+import urllib.request
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -9,14 +12,16 @@ load_dotenv(override=True)
 
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
-
-# 🎯 구글 공식 최신 플래시 통합명인 gemini-flash-latest 사용!
 raw_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
 MODEL_NAME = raw_model.replace("models/", "")
 
+# 🎯 네이버 API 키 환경변수 로드
+NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "").strip()
+NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "").strip()
+
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 네이버 실물 이미지 동적 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,10 +31,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 📸 네이버 이미지 검색 함수 (실물 사진 2장 자동 수집)
+def get_naver_real_images(keyword: str):
+    # 기본 백업 이미지 (네이버 검색 실패 시 사용)
+    default_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
+    default_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
+
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+        print("⚠️ NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET 설정되지 않음 -> 기본 이미지 사용")
+        return default_exterior, default_interior
+
+    try:
+        encText = urllib.parse.quote(f"{keyword} 아파트 단지 현장")
+        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=5&sort=sim&filter=medium"
+        
+        request = urllib.request.Request(url)
+        request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
+        request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
+        
+        response = urllib.request.urlopen(request)
+        rescode = response.getcode()
+        
+        if rescode == 200:
+            response_body = response.read()
+            data = json.loads(response_body.decode('utf-8'))
+            items = data.get('items', [])
+            
+            if len(items) >= 2:
+                # 검색된 실제 사진 중 1번째, 2번째 고화질 이미지 추출
+                img1 = items[0]['link']
+                img2 = items[1]['link']
+                return img1, img2
+            elif len(items) == 1:
+                return items[0]['link'], default_interior
+    except Exception as e:
+        print(f"⚠️ 네이버 이미지 검색 중 오류 발생: {str(e)}")
+
+    return default_exterior, default_interior
+
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
     topic: str = Field(..., example="올림픽파크포레온 매매 전망 및 입지 분석")
-    access_code: str = Field(..., example="4785949", description="접근 암호 (필수)")
+    access_code: str = Field(..., example="4785949")
 
 class BlogResponse(BaseModel):
     success: bool
@@ -44,9 +87,11 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
+    # 🎯 [핵심] 입력된 지역과 주제로 네이버에서 진짜 실물 현장 사진 2장 자동 수집!
+    search_keyword = f"{request.location} {request.topic.split()[0]}"
+    img_exterior, img_interior = get_naver_real_images(search_keyword)
+
     place_url = "https://map.naver.com/p/entry/place/2004075757"
-    img_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
-    img_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
 
     prompt = f"""
     너는 현장을 발로 뛰며 깊이 있는 분석을 제공하는 부동산 대표 전문 블로거 '호수부동산'이야.
@@ -74,7 +119,7 @@ async def generate_blog(request: BlogRequest):
        ({request.location} 일대의 시세 움직임, 매도자/매수자 심리, 실거래가 추이, 입주장 및 매물 소진 분위기를 최소 4~5문장 이상으로 풍부하고 상세하게 분석해 작성할 것)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_exterior}" alt="{request.location} 단지 전경" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_exterior}" alt="{request.location} 현장 사진 1" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     3. 두 번째 소제목 및 핵심 입지 분석:
@@ -84,7 +129,7 @@ async def generate_blog(request: BlogRequest):
        • 📈 <b>미래 가치 & 대장주 프리미엄</b>: (주요 개발 호재 및 대단지 프리미엄의 장기 우상향 동력을 2문장으로 작성)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_interior}" alt="{request.location} 단지 인프라" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_interior}" alt="{request.location} 현장 사진 2" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     4. 세 번째 소제목 및 실전 매수 전략 체크리스트 박스:
