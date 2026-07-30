@@ -32,52 +32,49 @@ app.add_middleware(
 )
 
 # 📸 [고도화] 유튜브 썸네일 및 초상권/저작권 노이즈를 싹 제거하는 정밀 이미지 검색 함수
-def get_naver_real_images(keyword: str):
-    # 기본 백업 이미지 (네이버 검색 실패 시 사용)
+def get_naver_real_images(location: str):
+    # 백업용 100% 안전 고화질 건물 사진
     default_exterior = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
     default_interior = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
 
     if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-        print("⚠️ NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET 설정되지 않음 -> 기본 이미지 사용")
         return default_exterior, default_interior
 
     try:
-        # 🎯 1. 검색어 단에서 '-유튜브 -방송'을 명시해 1차 찌꺼기 차단
-        clean_keyword = f"{keyword} 아파트 단지 -유튜브 -방송"
+        # 단지 건물 전경 키워드로 30개 검색
+        clean_keyword = f"{location} 아파트 단지 건물 전경"
         encText = urllib.parse.quote(clean_keyword)
         
-        # 🎯 2. 검수를 위해 20개의 결과를 넉넉하게 불러옴
-        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=20&sort=sim&filter=medium"
+        url = f"https://openapi.naver.com/v1/search/image?query={encText}&display=30&sort=sim&filter=medium"
         
         request = urllib.request.Request(url)
         request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
         request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
         
         response = urllib.request.urlopen(request)
-        rescode = response.getcode()
-        
-        if rescode == 200:
-            response_body = response.read()
-            data = json.loads(response_body.decode('utf-8'))
+        if response.getcode() == 200:
+            data = json.loads(response.read().decode('utf-8'))
             items = data.get('items', [])
             
-            # 🛡️ 3. 강제 차단할 노이즈 키워드/도메인 블랙리스트
-            blacklist = [
-                'ytimg.com', 'youtube', 'thumbnail', 'thumb', 
-                'blogpds', 'post-phinf', 'namu.wiki', 'capture', 'face'
+            # 🛡️ 1. 링크 도메인 + 블로그 제목(title)에 포함된 자극적 찌라시 단어 블랙리스트
+            bad_keywords = [
+                'ytimg', 'youtube', 'thumb', 'capture', 'face', 'tv', 'news',
+                '유튜브', '상가', '울고', '현실', '속보', '폭락', '폭등', '경악',
+                '인터뷰', '방송', '채널', '구독', '카드뉴스', '자막', '유튜버', '썸네일'
             ]
             
             clean_images = []
             for item in items:
-                link = item.get('link', '')
+                link = item.get('link', '').lower()
+                title = item.get('title', '').lower()
                 
-                # 블랙리스트 도메인이 들어간 링크는 단칼에 무시
-                if any(bad_word in link.lower() for bad_word in blacklist):
+                # 🎯 2중 검문: 이미지 링크나 원본 글 제목에 블랙리스트 단어가 하나라도 있으면 바로 스킵!
+                if any(bad in link for bad in bad_keywords) or any(bad in title for bad in bad_keywords):
                     continue
                 
-                clean_images.append(link)
+                clean_images.append(item.get('link'))
                 
-                # 안전한 필터링 이미지 2장이 모이면 검색 즉시 종료
+                # 깨끗한 사진 2장 확보되면 즉시 종료
                 if len(clean_images) == 2:
                     break
             
@@ -87,7 +84,7 @@ def get_naver_real_images(keyword: str):
                 return clean_images[0], default_interior
 
     except Exception as e:
-        print(f"⚠️ 네이버 정밀 이미지 검색 중 오류 발생: {str(e)}")
+        print(f"⚠️ 이미지 정밀 검색 실패: {e}")
 
     return default_exterior, default_interior
 
