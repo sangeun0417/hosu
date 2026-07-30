@@ -29,7 +29,7 @@ app.add_middleware(
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
     topic: str = Field(..., example="올림픽파크포레온 매매 전망 및 입지 분석")
-    access_code: str = Field(default="4785949", example="4785949")
+    access_code: str = Field(..., example="4785949", description="접근 암호 (필수)")
 
 class BlogResponse(BaseModel):
     success: bool
