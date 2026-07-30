@@ -16,7 +16,7 @@ MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 100% 실시간 AI 이미지 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 이미지 엑박 방지 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,12 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🎨 [100% AI 즉석 생성] 에러 없이 100% AI 그림을 실시간으로 그려내는 함수 (FLUX AI 모델 연동)
+# 📸 [보험용] AI 생성 지연 시 즉시 대체할 100% 안전 고화질 아파트 외관 및 실내 이미지
+FALLBACK_EXTERIOR = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
+FALLBACK_INTERIOR = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
+
+# 🎨 [100% AI 실시간 생성] FLUX AI 엔진 연동
 def get_pollinations_ai_image(prompt_text: str) -> str:
-    # 매번 완전히 새로운 AI 그림을 그리도록 무작위 시드값 부여
     seed = random.randint(1, 999999)
     encoded_prompt = urllib.parse.quote(prompt_text)
-    # nologo=true & model=flux 적용으로 고화질 AI 부동산 이미지 생성
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&seed={seed}&nologo=true&model=flux"
 
 class BlogRequest(BaseModel):
@@ -55,16 +57,16 @@ async def generate_blog(request: BlogRequest):
     # 🏢 1. 아파트 건물 외관 AI 프롬프트 (서울 도심 고층 아파트)
     ext_prompt = (
         f"photorealistic modern high rise apartment building complex in {request.location} Seoul Korea, "
-        f"real estate photography, sunny day, 8k, architectural masterpiece, exterior view"
+        f"real estate photography, sunny day, 8k, exterior view"
     )
     
     # 🛋️ 2. 아파트 실내 인테리어 AI 프롬프트 (한국형 모던 거실)
     int_prompt = (
         f"photorealistic modern Korean apartment living room interior, luxury apartment in {request.location}, "
-        f"minimalist interior design, bright sunlight, wide window view, clean furniture"
+        f"minimalist interior design, bright sunlight, wide window view"
     )
 
-    # 🖼️ 100% AI가 실시간으로 직접 그려낸 이미지 URL 획득
+    # 🖼️ AI 생성 URL 지점
     img_exterior = get_pollinations_ai_image(ext_prompt)
     img_interior = get_pollinations_ai_image(int_prompt)
 
@@ -96,7 +98,7 @@ async def generate_blog(request: BlogRequest):
        ({request.location} 일대의 시세 움직임, 매도자/매수자 심리, 실거래가 추이, 입주장 및 매물 소진 분위기를 최소 4~5문장 이상으로 풍부하고 상세하게 분석해 작성할 것)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_exterior}" alt="{request.location} AI 현장 사진 1" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_exterior}" alt="{request.location} AI 현장 사진 1" onerror="this.onerror=null; this.src='{FALLBACK_EXTERIOR}';" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     3. 두 번째 소제목 및 핵심 입지 분석:
@@ -106,7 +108,7 @@ async def generate_blog(request: BlogRequest):
        • 📈 <b>미래 가치 & 대장주 프리미엄</b>: (주요 개발 호재 및 대단지 프리미엄의 장기 우상향 동력을 2문장으로 작성)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_interior}" alt="{request.location} AI 현장 사진 2" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_interior}" alt="{request.location} AI 현장 사진 2" onerror="this.onerror=null; this.src='{FALLBACK_INTERIOR}';" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     4. 세 번째 소제목 및 실전 매수 전략 체크리스트 박스:
