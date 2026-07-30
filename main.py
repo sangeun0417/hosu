@@ -1,5 +1,6 @@
 import os
-import base64
+import random
+import urllib.parse
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -15,7 +16,7 @@ MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - Imagen 3 AI 이미지 맞춤 생성 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 100% 실시간 AI 이미지 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,33 +26,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🎨 [AI 맞춤 생성] 구글 Imagen 3 모델을 활용해 극사실주의 부동산 사진을 즉석 생성하는 함수
-def generate_ai_real_estate_image(prompt_text: str, fallback_url: str) -> str:
-    if not client:
-        return fallback_url
-
-    try:
-        # 구글 Imagen 3 모델 호출
-        result = client.models.generate_images(
-            model='imagen-3.0-generate-002',
-            prompt=prompt_text,
-            config=dict(
-                number_of_images=1,
-                aspect_ratio="16:9",
-                output_mime_type="image/jpeg"
-            )
-        )
-        
-        # 생성된 이미지 바이트를 Base64 데이터 URL로 변환하여 HTML에 직접 삽입
-        for generated_image in result.generated_images:
-            encoded = base64.b64encode(generated_image.image.image_bytes).decode('utf-8')
-            return f"data:image/jpeg;base64,{encoded}"
-
-    except Exception as e:
-        print(f"⚠️ Imagen 3 이미지 생성 실패 (기본 고화질 이미지 대체): {e}")
-        return fallback_url
-
-    return fallback_url
+# 🎨 [100% AI 즉석 생성] 에러 없이 100% AI 그림을 실시간으로 그려내는 함수 (FLUX AI 모델 연동)
+def get_pollinations_ai_image(prompt_text: str) -> str:
+    # 매번 완전히 새로운 AI 그림을 그리도록 무작위 시드값 부여
+    seed = random.randint(1, 999999)
+    encoded_prompt = urllib.parse.quote(prompt_text)
+    # nologo=true & model=flux 적용으로 고화질 AI 부동산 이미지 생성
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&seed={seed}&nologo=true&model=flux"
 
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
@@ -71,23 +52,21 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🏢 1. 아파트 건물 외관 프롬프트 (서울 도심 고층 아파트 전경 지정)
+    # 🏢 1. 아파트 건물 외관 AI 프롬프트 (서울 도심 고층 아파트)
     ext_prompt = (
-        f"A photorealistic, architectural photography style exterior shot of a modern luxury high-rise "
-        f"apartment building complex in {request.location}, Seoul, South Korea. Sunny daylight, 8k resolution, clean background."
+        f"photorealistic modern high rise apartment building complex in {request.location} Seoul Korea, "
+        f"real estate photography, sunny day, 8k, architectural masterpiece, exterior view"
     )
-    fallback_ext = "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80"
     
-    # 🛋️ 2. 아파트 실내 인테리어 프롬프트 (한국형 모던 거실 지정)
+    # 🛋️ 2. 아파트 실내 인테리어 AI 프롬프트 (한국형 모던 거실)
     int_prompt = (
-        f"A photorealistic interior view of a modern luxury Korean apartment living room in {request.location}, "
-        f"minimalist interior design, large windows, bright sunlight, clean modern furniture, high resolution."
+        f"photorealistic modern Korean apartment living room interior, luxury apartment in {request.location}, "
+        f"minimalist interior design, bright sunlight, wide window view, clean furniture"
     )
-    fallback_int = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80"
 
-    # 🖼️ Imagen 3 AI 모델로 100% 맞춤형 이미지 2장 즉석 생성
-    img_exterior = generate_ai_real_estate_image(ext_prompt, fallback_ext)
-    img_interior = generate_ai_real_estate_image(int_prompt, fallback_int)
+    # 🖼️ 100% AI가 실시간으로 직접 그려낸 이미지 URL 획득
+    img_exterior = get_pollinations_ai_image(ext_prompt)
+    img_interior = get_pollinations_ai_image(int_prompt)
 
     place_url = "https://map.naver.com/p/entry/place/2004075757"
 
@@ -117,7 +96,7 @@ async def generate_blog(request: BlogRequest):
        ({request.location} 일대의 시세 움직임, 매도자/매수자 심리, 실거래가 추이, 입주장 및 매물 소진 분위기를 최소 4~5문장 이상으로 풍부하고 상세하게 분석해 작성할 것)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_exterior}" alt="{request.location} 현장 사진 1" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_exterior}" alt="{request.location} AI 현장 사진 1" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     3. 두 번째 소제목 및 핵심 입지 분석:
@@ -127,7 +106,7 @@ async def generate_blog(request: BlogRequest):
        • 📈 <b>미래 가치 & 대장주 프리미엄</b>: (주요 개발 호재 및 대단지 프리미엄의 장기 우상향 동력을 2문장으로 작성)
 
        <div style="text-align: center; margin: 20px 0;">
-           <img src="{img_interior}" alt="{request.location} 현장 사진 2" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+           <img src="{img_interior}" alt="{request.location} AI 현장 사진 2" style="width: 100%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
        </div>
 
     4. 세 번째 소제목 및 실전 매수 전략 체크리스트 박스:
