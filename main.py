@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -27,24 +28,27 @@ app.add_middleware(
 
 # 📸 [100% 안전 + 관련성 극대화] 도심 고층 아파트 & 모던 실내 인테리어 전용 화보 공급 함수
 def get_safe_real_estate_images():
-    # 🏢 도심 고층 아파트 단지 건물 전경 (풀빌라/단독주택 완전 제외)
+    # 🏢 100% 도심 고층 아파트 단지 건물 전경 (단독주택/열쇠모형/야자수 완전 제거)
     exteriors = [
-        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80", # 고층 아파트 단지
-        "https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80", # 도심 주거 타워
-        "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=800&q=80", # 현대식 고층 주거 아파트
-        "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80", # 고층 아파트 건물 전경
-        "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80"  # 도심 아파트 빌딩 뷰
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80", # 도심 고층 아파트 단지
+        "https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80", # 고밀도 아파트 타워
+        "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=800&q=80", # 현대식 아파트 건물
+        "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80"   # 도심 아파트 빌딩
     ]
     
-    # 🛋️ 한국 아파트 구조와 유사한 모던 실내 인테리어 (거실, 주방)
+    # 🛋️ 100% 한국 아파트 구조 느낌의 모던 실내 거실/인테리어 화보
     interiors = [
-        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80", # 모던한 거실 공간
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80", # 아파트 실내 인테리어
-        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80", # 화이트톤 거실 전경
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80"  # 모던 주방 및 거실
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80", # 모던 아파트 거실
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80", # 깔끔한 거실 공간
+        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80"  # 화이트톤 아파트 거실
     ]
     
-    return random.choice(exteriors), random.choice(interiors)
+    # 🎯 브라우저 이미지 캐싱 방지용 타임스탬프 파라미터 추가
+    cache_buster = int(time.time())
+    img1 = f"{random.choice(exteriors)}&cb={cache_buster}"
+    img2 = f"{random.choice(interiors)}&cb={cache_buster+1}"
+    
+    return img1, img2
 
 class BlogRequest(BaseModel):
     location: str = Field(..., example="강동구 둔촌동")
@@ -64,7 +68,7 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🎯 도심 아파트 주제와 입치성이 뛰어난 안전 이미지 2장 획득
+    # 🎯 도심 아파트 주제와 입치성이 뛰어난 안전 이미지 2장 획득 (캐시 방지 적용)
     img_exterior, img_interior = get_safe_real_estate_images()
 
     place_url = "https://map.naver.com/p/entry/place/2004075757"
