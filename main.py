@@ -15,7 +15,7 @@ MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - 프리미엄 클린 이미지 연동")
+app = FastAPI(title="호수부동산 AI 백엔드 API - 도심 아파트 맞춤 클린 이미지 연동")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,27 +25,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📸 [100% 안전] 저작권/초상권 리스크 0% 프리미엄 부동산 이미지 공급 함수
+# 📸 [100% 안전 + 관련성 극대화] 도심 고층 아파트 & 모던 실내 인테리어 전용 화보 공급 함수
 def get_safe_real_estate_images():
-    # 🏢 고급 아파트 건물 외관 화보 모음 (Unsplash CC0 라이선스)
+    # 🏢 도심 고층 아파트 단지 건물 전경 (풀빌라/단독주택 완전 제외)
     exteriors = [
-        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80", # 고층 아파트 단지
+        "https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=80", # 도심 주거 타워
+        "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=800&q=80", # 현대식 고층 주거 아파트
+        "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80", # 고층 아파트 건물 전경
+        "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80"  # 도심 아파트 빌딩 뷰
     ]
     
-    # 🛋️ 프리미엄 아파트 실내 인테리어 화보 모음 (Unsplash CC0 라이선스)
+    # 🛋️ 한국 아파트 구조와 유사한 모던 실내 인테리어 (거실, 주방)
     interiors = [
-        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80",
-        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80"
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80", # 모던한 거실 공간
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80", # 아파트 실내 인테리어
+        "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80", # 화이트톤 거실 전경
+        "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80"  # 모던 주방 및 거실
     ]
     
-    # 원고 생성 시 다채로운 비주얼을 위해 랜덤 조합
     return random.choice(exteriors), random.choice(interiors)
 
 class BlogRequest(BaseModel):
@@ -66,7 +64,7 @@ async def generate_blog(request: BlogRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API Key가 서버에 설정되지 않았습니다.")
 
-    # 🎯 저작권 100% 안전한 프리미엄 외관 & 실내 사진 획득
+    # 🎯 도심 아파트 주제와 입치성이 뛰어난 안전 이미지 2장 획득
     img_exterior, img_interior = get_safe_real_estate_images()
 
     place_url = "https://map.naver.com/p/entry/place/2004075757"
@@ -134,7 +132,7 @@ async def generate_blog(request: BlogRequest):
             contents=prompt
         )
         raw_text = response.text.strip()
-        lines = raw_text.split("\n")
+        lines = raw_text.strip().split("\n")
         title = lines[0].replace("[제목]", "").replace("제목:", "").strip()
         
         words = title.split()
