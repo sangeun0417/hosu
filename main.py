@@ -10,13 +10,13 @@ load_dotenv(override=True)
 api_key = os.getenv("GEMINI_API_KEY", "").strip()
 VALID_ACCESS_CODE = os.getenv("ACCESS_CODE", "4785949").strip()
 
-# 🎯 환경변수에서 gemini-2.5-flash 로드 (models/ 접두사 제거 안전 처리)
-raw_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+# 🎯 단종된 2.5-flash 대신 정식 지원되는 gemini-1.5-flash (또는 gemini-2.0-flash) 지정
+raw_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
 MODEL_NAME = raw_model.replace("models/", "")
 
 client = genai.Client(api_key=api_key) if api_key else None
 
-app = FastAPI(title="호수부동산 AI 백엔드 API - Gemini 2.5 Flash 적용")
+app = FastAPI(title="호수부동산 AI 백엔드 API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,7 +106,6 @@ async def generate_blog(request: BlogRequest):
     """
 
     try:
-        # 🎯 gemini-2.5-flash 모델 직접 호출
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt
